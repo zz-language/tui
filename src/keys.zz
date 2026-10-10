@@ -27,59 +27,59 @@ pub const KEY_HOME:int = 1004
 pub const KEY_END:int = 1005
 pub const KEY_DELETE:int = 1006
 
-pub func keys.eof() -> int {
+pub func eof() -> int {
     KEY_EOF
 }
 
-pub func keys.ctrl_c() -> int {
+pub func ctrl_c() -> int {
     KEY_CTRL_C
 }
 
-pub func keys.tab() -> int {
+pub func tab() -> int {
     KEY_TAB
 }
 
-pub func keys.enter() -> int {
+pub func enter() -> int {
     KEY_ENTER
 }
 
-pub func keys.esc() -> int {
+pub func esc() -> int {
     KEY_ESC
 }
 
-pub func keys.space() -> int {
+pub func space() -> int {
     KEY_SPACE
 }
 
-pub func keys.backspace() -> int {
+pub func backspace() -> int {
     KEY_BACKSPACE
 }
 
-pub func keys.left() -> int {
+pub func left() -> int {
     KEY_LEFT
 }
 
-pub func keys.right() -> int {
+pub func right() -> int {
     KEY_RIGHT
 }
 
-pub func keys.up() -> int {
+pub func up() -> int {
     KEY_UP
 }
 
-pub func keys.down() -> int {
+pub func down() -> int {
     KEY_DOWN
 }
 
-pub func keys.home() -> int {
+pub func home() -> int {
     KEY_HOME
 }
 
-pub func keys.end() -> int {
+pub func end() -> int {
     KEY_END
 }
 
-pub func keys.delete() -> int {
+pub func delete() -> int {
     KEY_DELETE
 }
 
@@ -87,7 +87,7 @@ pub func keys.delete() -> int {
 // Arrows: 65 up, 66 down, 67 right, 68 left. Home/End: 72 / 70.
 // Unknown finals pass through as their own byte value.
 
-pub func keys.decode_csi(fin: int) -> int {
+pub func decode_csi(fin: int) -> int {
     if fin == 65 {
         return KEY_UP
     }
@@ -112,7 +112,7 @@ pub func keys.decode_csi(fin: int) -> int {
 // Map a `~`-terminated sequence number to a KEY_* code (pure).
 // 1 = Home, 3 = Delete, 4 = End. Anything else passes through.
 
-pub func keys.decode_tilde(n: int) -> int {
+pub func decode_tilde(n: int) -> int {
     if n == 1 {
         return KEY_HOME
     }
@@ -130,7 +130,7 @@ pub func keys.decode_tilde(n: int) -> int {
 // bytes. A leading ESC followed by a non-introducer resolves to a lone
 // ESC with 1 consumed; the rest stays for the next call.
 
-pub func keys.decode(buf: [int]) -> (int, int) {
+pub func decode(buf: [int]) -> (int, int) {
     n := len(buf)
     if n == 0 {
         return (KEY_MORE, 0)
@@ -155,11 +155,11 @@ pub func keys.decode(buf: [int]) -> (int, int) {
             return (KEY_MORE, 0)
         }
         if buf[3] == 126 {
-            return (keys.decode_tilde(b3 - 48), 4)
+            return (decode_tilde(b3 - 48), 4)
         }
-        return (keys.decode_csi(b3), 3)
+        return (decode_csi(b3), 3)
     }
-    (keys.decode_csi(b3), 3)
+    (decode_csi(b3), 3)
 }
 
 // One raw byte from stdin, or -1 when the read fails (closed stdin).
@@ -175,7 +175,7 @@ func raw() -> int {
 // sequences decode to KEY_* codes, a lone ESC returns KEY_ESC without
 // blocking (50 ms poll), failures return KEY_EOF.
 
-pub func keys.read() -> int {
+pub func read() -> int {
     b := raw()
     if b != 27 {
         return b
@@ -201,7 +201,7 @@ func read_seq() -> int {
         if b3 == -1 {
             return 27
         }
-        return keys.decode_csi(b3)
+        return decode_csi(b3)
     }
     27
 }
@@ -214,9 +214,9 @@ func read_csi() -> int {
     if b3 >= 49 && b3 <= 52 {
         b4 := raw()
         if b4 == 126 {
-            return keys.decode_tilde(b3 - 48)
+            return decode_tilde(b3 - 48)
         }
-        return keys.decode_csi(b3)
+        return decode_csi(b3)
     }
-    keys.decode_csi(b3)
+    decode_csi(b3)
 }

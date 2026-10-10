@@ -16,6 +16,6 @@
 // `keys.eof()` on the first failed read. Non-TTY callers should branch
 // on `screen.is_tty()` before entering.
 
-pub func tui.version() -> str {
+pub func version() -> str {
     "0.1.0"
 }
