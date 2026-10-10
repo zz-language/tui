@@ -11,6 +11,7 @@ Own the terminal. Enter once, `defer` the exit, draw, flush.
 | Function | Signature | Notes |
 |----------|-----------|-------|
 | `enter` | `() -> bool` | Raw + alt screen + hidden cursor. `false` when no TTY (terminal untouched) |
+| `mode` | `() -> int` | Color capability: 3 truecolor, 2 256-color, 1 basic16, 0 none (`NO_COLOR` wins) |
 | `exit` | `() -> unit` | Cursor back, main screen back, cooked mode. Idempotent, errors swallowed |
 | `is_tty` | `() -> bool` | Gate `enter` on this for clean pipes |
 | `size` | `() -> [int]` | `[cols, rows]`; `[80, 24]` when unknown |
@@ -32,13 +33,16 @@ defer screen.exit()
 
 Codes: singles are raw bytes (`13` Enter, `32` Space, `127`
 Backspace, `3` Ctrl+C, `9` Tab); arrows `1000`–`1003`
-(Left, Right, Up, Down); `1004` Home, `1005` End, `1006` Delete;
-`-1` EOF/closed stdin; `-3` (`decode` only) means "need more bytes".
+(Left, Right, Up, Down); `1004` Home, `1005` End, `1006` Delete,
+`1007` PgUp, `1008` PgDn (the page keys extend `ask`'s table for
+scrolling lists); `-1` EOF/closed stdin; `-3` (`decode` only) means
+"need more bytes".
 
 | Function | Signature | Notes |
 |----------|-----------|-------|
 | `eof`, `ctrl_c`, `tab`, `enter`, `esc`, `space`, `backspace` | `() -> int` | Named singles |
 | `left`, `right`, `up`, `down`, `home`, `end`, `delete` | `() -> int` | Named specials |
+| `pgup`, `pgdn` | `() -> int` | Page keys (scrolling lists) |
 | `decode_csi` | `(fin: int) -> int` | CSI/SS3 final byte → code (pure) |
 | `decode_tilde` | `(n: int) -> int` | `~`-sequence number → code (pure) |
 | `decode` | `(buf: [int]) -> (int, int)` | `(key, consumed)`; `consumed == 0` needs more bytes (pure) |
@@ -96,11 +100,87 @@ Glyphs should be single-cell (ASCII or wide-safe symbols like
 `♞`); CJK/emoji widths are not measured.
 
 ## `tui.dialog`
-
 | Function | Signature | Notes |
 |----------|-----------|-------|
 | `note` | `(lines: [str]) -> int` | Centered box until any key; returns the key (Enter on pipes) |
 | `confirm_box` | `(msg: str) -> bool` | `y`/`Y`/Enter confirm; `n`/`N`/Esc/EOF decline; `[y/N]` prompt on pipes |
+
+## `tui.multi`
+
+Fullscreen checkbox list (screen twin of prompt-style picking).
+
+| Function | Signature | Notes |
+|----------|-----------|-------|
+| `toggle` | `(picked: [int], idx: int) -> [int]` | Pure sorted insert/remove (pure) |
+| `choose` | `(title: str, options: [str]) -> ([int], bool)` | Space toggles, Enter confirms set, Esc/EOF cancels; comma-list fallback on pipes |
+
+## `tui.tabs`
+
+Tab strip for multi-view screens (no loop prescribed — drive with `read`).
+
+| Function | Signature | Notes |
+|----------|-----------|-------|
+| `step` | `(sel: int, n: int, key: int) -> int` | Wrap-around (arrows/hjkl), pure |
+| `render` | `(titles: [str], sel: int) -> str` | `" a │ b "` strip, active reversed (pure) |
+
+## `tui.layout`
+
+Width-aware string ops (visible cells via `strip`, so styled strings align).
+
+| Function | Signature | Notes |
+|----------|-----------|-------|
+| `visible` | `(s: str) -> int` | Cell count excluding escapes (pure) |
+| `pad` | `(s: str, w: int) -> str` | Right-pad to width (pure) |
+| `center` | `(s: str, w: int) -> str` | Center in width, extra space right (pure) |
+| `trunc` | `(s: str, w: int) -> str` | Clip with `…` (plain strings; strip styled input first) (pure) |
+
+## `tui.status`
+
+| Function | Signature | Notes |
+|----------|-----------|-------|
+| `bar` | `(left: str, center: str, right: str, w: int) -> str` | One exact-width line; center truncates first (pure) |
+
+## `tui.log`
+
+`Log` is `{ lines: [str], cap: int }` (value semantics).
+
+| Function | Signature | Notes |
+|----------|-----------|-------|
+| `blank` | `(cap: int) -> Log` | Empty buffer |
+| `push` | `(l: Log, s: str) -> Log` | Append, drop oldest past cap |
+| `view` | `(l: Log, height: int, scroll: int) -> [str]` | Last `height` lines ending `scroll` up from the tail |
+
+## `tui.mouse`
+
+SGR mouse (1006). Buttons: 0 left, 1 middle, 2 right, 64/65 wheel;
+release adds 1000. Coordinates 0-based cells.
+
+| Function | Signature | Notes |
+|----------|-----------|-------|
+| `enable` | `() -> bool` | Send mode escapes (false when no TTY, nothing sent) |
+| `disable` | `() -> unit` | Leave mouse mode |
+| `decode` | `(buf: [int]) -> Click` | Pure; `n` 0 = truncated, 1 = resync past non-mouse |
+| `next` | `() -> Click` | Blocking read of one event; EOF yields `b = -1` |
+
+`Click` is `{ b: int, x: int, y: int, n: int }`.
+
+## `tui.clip`
+
+OSC 52 clipboard (works over SSH).
+
+| Function | Signature | Notes |
+|----------|-----------|-------|
+| `copy` | `(s: str) -> bool` | False when no TTY (nothing sent) |
+| `paste` | `() -> str` | Query + timed read (~300 ms); `""` when unanswered (treat as cancel) |
+
+## `tui.width`
+
+Display widths: 0 controls/combining, 2 wide CJK/emoji blocks, else 1.
+
+| Function | Signature | Notes |
+|----------|-----------|-------|
+| `width` | `(cp: int) -> int` | Codepoint width (pure) |
+| `str_width` | `(s: str) -> int` | Whole-string width (pure) |
 
 ## `tui`
 

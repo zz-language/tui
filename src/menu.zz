@@ -56,22 +56,6 @@ pub func step(sel: int, n: int, key: int) -> int {
     }
 }
 
-func draw(title: str, options: [str], sel: int) {
-    screen.clear()
-    println(title)
-    println("")
-    i := 0
-    while i < len(options) {
-        if i == sel {
-            println("> " + colors.reverse(options[i]))
-        } else {
-            println("  " + options[i])
-        }
-        i = i + 1
-    }
-    screen.flush()
-}
-
 // Numbered fallback for pipes: three bad reads (including EOF) bail
 // out with -1 instead of spinning.
 
@@ -100,9 +84,10 @@ func choose_plain(title: str, options: [str]) -> int {
     0 - 1
 }
 
-// Fullscreen menu. Returns the chosen index, or -1 on Esc / EOF /
-// empty options. Marker plus reverse highlight so it reads on
-// colorless terminals too.
+// Fullscreen menu with a scrolling window for long lists.
+// Returns the chosen index, or -1 on Esc / EOF / empty options.
+// Marker plus reverse highlight so it reads on colorless terminals
+// too; PgUp/PgDn jump a full window.
 
 pub func choose(title: str, options: [str]) -> int {
     n := len(options)
@@ -112,10 +97,25 @@ pub func choose(title: str, options: [str]) -> int {
     if !screen.is_tty() {
         return choose_plain(title, options)
     }
+    height := 10
+    sz := screen.size()
+    if sz[1] - 4 < height {
+        height = sz[1] - 4
+    }
+    if height < 3 {
+        height = 3
+    }
     sel := 0
+    off := 0
     live := 1
     while live == 1 {
-        draw(title, options, sel)
+        if sel < off {
+            off = sel
+        }
+        if sel >= off + height {
+            off = sel - height + 1
+        }
+        draw_win(title, options, sel, off, height)
         k := keys.read()
         if k == keys.enter() {
             return sel
@@ -126,10 +126,50 @@ pub func choose(title: str, options: [str]) -> int {
                 if k == keys.eof() {
                     return 0 - 1
                 } else {
-                    sel = step(sel, n, k)
+                    if k == keys.pgup() {
+                        sel = sel - height
+                        if sel < 0 {
+                            sel = 0
+                        }
+                    } else {
+                        if k == keys.pgdn() {
+                            sel = sel + height
+                            if sel > n - 1 {
+                                sel = n - 1
+                            }
+                        } else {
+                            sel = step(sel, n, k)
+                        }
+                    }
                 }
             }
         }
     }
     0 - 1
+}
+
+func draw_win(title: str, options: [str], sel: int, off: int, height: int) {
+    screen.clear()
+    println(title)
+    println("")
+    if off > 0 {
+        println("  ↑ " + str(off) + " more")
+    }
+    i := off
+    last := off + height
+    if last > len(options) {
+        last = len(options)
+    }
+    while i < last {
+        if i == sel {
+            println("> " + colors.reverse(options[i]))
+        } else {
+            println("  " + options[i])
+        }
+        i = i + 1
+    }
+    if last < len(options) {
+        println("  ↓ " + str(len(options) - last) + " more")
+    }
+    screen.flush()
 }

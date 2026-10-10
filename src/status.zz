@@ -1,0 +1,19 @@
+// status — one-line status bars: left + centered + right.
+import tui.layout
+
+// Single status line of exactly width w (center truncated first when
+// tight; overflow beyond w is returned as-is, never wrapped).
+
+pub func bar(left: str, center: str, right: str, w: int) -> str {
+    lv := layout.visible(left)
+    rv := layout.visible(right)
+    mid := w - lv - rv
+    if mid < 0 {
+        return layout.trunc(left + center + right, w)
+    }
+    c := center
+    if layout.visible(center) > mid {
+        c = layout.trunc(center, mid)
+    }
+    layout.pad(left + layout.center(c, mid) + right, w)
+}

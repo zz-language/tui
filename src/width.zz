@@ -1,0 +1,71 @@
+// width — display widths for East Asian wide/fullwidth and emoji.
+//
+// 0 for controls/combining, 2 for wide blocks, 1 otherwise. Unknown
+// codepoints (unassigned planes) read 1. Used wherever columns must
+// line up with non-ASCII glyphs.
+pub func width(cp: int) -> int {
+    if cp < 32 {
+        return 0
+    }
+    if cp >= 768 && cp <= 879 {
+        return 0
+    }
+    if cp == 8203 {
+        return 0
+    }
+    if cp >= 65056 && cp <= 65071 {
+        return 0
+    }
+    if cp == 65279 {
+        return 0
+    }
+    if cp >= 4352 && cp <= 4447 {
+        return 2
+    }
+    if cp >= 11904 && cp <= 42191 {
+        return 2
+    }
+    if cp >= 44032 && cp <= 55203 {
+        return 2
+    }
+    if cp >= 63744 && cp <= 64255 {
+        return 2
+    }
+    if cp >= 65040 && cp <= 65049 {
+        return 2
+    }
+    if cp >= 65281 && cp <= 65376 {
+        return 2
+    }
+    if cp >= 65504 && cp <= 65510 {
+        return 2
+    }
+    if cp >= 131072 && cp <= 191471 {
+        return 2
+    }
+    if cp >= 127744 && cp <= 128591 {
+        return 2
+    }
+    if cp >= 128640 && cp <= 128767 {
+        return 2
+    }
+    if cp >= 129280 && cp <= 129535 {
+        return 2
+    }
+    if cp >= 127462 && cp <= 127487 {
+        return 2
+    }
+    1
+}
+
+// Display width of a whole string.
+
+pub func str_width(s: str) -> int {
+    w := 0
+    i := 0
+    while i < len(s) {
+        w = w + width(ord(s[i]))
+        i = i + 1
+    }
+    w
+}

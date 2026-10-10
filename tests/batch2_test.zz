@@ -1,0 +1,100 @@
+// Batch 2: tabs, layout, status, log, mouse, clip, width.
+// All pure or non-TTY-graded — no terminal needed.
+import tui.clip
+import tui.layout
+import tui.log
+import tui.mouse
+import tui.multi
+import tui.status
+import tui.tabs
+import tui.width
+
+@test
+func tabs_render_step() {
+    assert_eq(tabs.step(0, 3, 1003), 1)
+    assert_eq(tabs.step(2, 3, 108), 0)
+    assert_eq(tabs.step(0, 3, 104), 2)
+    r := tabs.render(["a", "bb"], 1)
+    assert_eq(r, " a │\e[7m bb \e[0m")
+}
+
+@test
+func layout_ops() {
+    assert_eq(layout.visible("hi"), 2)
+    assert_eq(layout.pad("hi", 4), "hi  ")
+    assert_eq(layout.pad("hi", 1), "hi")
+    assert_eq(layout.center("hi", 6), "  hi  ")
+    assert_eq(layout.trunc("hello", 4), "hel…")
+    assert_eq(layout.trunc("hi", 9), "hi")
+    assert_eq(layout.trunc("hello", 0), "")
+}
+
+@test
+func status_bar_pins() {
+    assert_eq(status.bar("L", "C", "R", 9), "L   C   R")
+    assert_eq(status.bar("", "", "", 3), "   ")
+}
+
+@test
+func log_push_view() {
+    l := log.blank(3)
+    l = log.push(l, "a")
+    l = log.push(l, "b")
+    l = log.push(l, "c")
+    l = log.push(l, "d")
+    v := log.view(l, 2, 0)
+    assert_eq(len(v), 2)
+    assert_eq(v[0], "c")
+    assert_eq(v[1], "d")
+    v = log.view(l, 2, 1)
+    assert_eq(v[0], "b")
+    assert_eq(v[1], "c")
+    v = log.view(l, 9, 0)
+    assert_eq(len(v), 3)
+}
+
+@test
+func mouse_decode_click() {
+    c := mouse.decode([27, 91, 60, 48, 59, 53, 59, 56, 77])
+    assert_eq(c.b, 0)
+    assert_eq(c.x, 4)
+    assert_eq(c.y, 7)
+    assert_eq(c.n, 9)
+    r := mouse.decode([27, 91, 60, 50, 59, 49, 59, 49, 109])
+    assert_eq(r.b, 1002)
+    c = mouse.decode([27, 91, 60])
+    assert_eq(c.n, 0)
+    c = mouse.decode([27, 88])
+    assert_eq(c.b, 0 - 1)
+    assert_eq(c.n, 1)
+    c = mouse.decode([27, 91, 60, 48])
+    assert_eq(c.n, 0)
+}
+
+@test
+func clip_degrades_off_tty() {
+    assert_eq(clip.copy("x"), false)
+    assert_eq(clip.paste(), "")
+}
+
+@test
+func width_table() {
+    assert_eq(width.width(65), 1)
+    assert_eq(width.width(10), 0)
+    assert_eq(width.width(20013), 2)
+    assert_eq(width.width(127744), 2)
+    assert_eq(width.str_width("hi"), 2)
+}
+
+@test
+func multi_toggle_orders() {
+    t := multi.toggle([], 2)
+    assert_eq(len(t), 1)
+    assert_eq(t[0], 2)
+    t = multi.toggle(t, 0)
+    assert_eq(t[0], 0)
+    assert_eq(t[1], 2)
+    t = multi.toggle(t, 2)
+    assert_eq(len(t), 1)
+    assert_eq(t[0], 0)
+}

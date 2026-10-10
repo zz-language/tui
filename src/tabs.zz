@@ -1,0 +1,33 @@
+// tabs — tab bar strip for multi-view screens.
+//
+// Navigation reuses `menu.step` (left/right/h/l, wrap-around); `render`
+// draws the strip with the active tab in reverse. Drive the loop in
+// your screen (no prescribed loop here by design).
+import std.colors
+
+import tui.menu
+
+// Pure: move the active tab. Left/h back, right/l forward, wrap.
+
+pub func step(sel: int, n: int, key: int) -> int {
+    menu.step(sel, n, key)
+}
+
+// Pure: " a │ b │ c " strip with the active title reversed.
+
+pub func render(titles: [str], sel: int) -> str {
+    out := ""
+    i := 0
+    while i < len(titles) {
+        t := " " + titles[i] + " "
+        if i == sel {
+            t = colors.reverse(t)
+        }
+        if i > 0 {
+            out = out + "│"
+        }
+        out = out + t
+        i = i + 1
+    }
+    out
+}

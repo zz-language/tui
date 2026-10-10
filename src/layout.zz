@@ -1,0 +1,59 @@
+// layout — width-aware string ops for lining up screens.
+//
+// All widths are VISIBLE cells (`colors.strip` first), so pre-styled
+// strings align. Plain strings only for `trunc` (styled input: strip
+// it first, style after padding).
+import std.colors
+
+// Visible cell count (escapes excluded).
+
+pub func visible(s: str) -> int {
+    len(colors.strip(s))
+}
+
+// Right-pad with spaces to width w (no-op when already wide).
+
+pub func pad(s: str, w: int) -> str {
+    out := s
+    n := len(colors.strip(s))
+    while n < w {
+        out = out + " "
+        n = n + 1
+    }
+    out
+}
+
+// Center in width w (extra space goes right).
+
+pub func center(s: str, w: int) -> str {
+    n := len(colors.strip(s))
+    if n >= w {
+        return s
+    }
+    left := (w - n) / 2
+    out := s
+    i := 0
+    while i < left {
+        out = " " + out
+        i = i + 1
+    }
+    pad(out, w)
+}
+
+// Clip to width w with … (w <= 0 gives "").
+
+pub func trunc(s: str, w: int) -> str {
+    if w <= 0 {
+        return ""
+    }
+    if len(s) <= w {
+        return s
+    }
+    out := ""
+    i := 0
+    while i < w - 1 {
+        out = out + s[i]
+        i = i + 1
+    }
+    out + "…"
+}

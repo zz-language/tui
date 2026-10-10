@@ -26,6 +26,8 @@ pub const KEY_DOWN:int = 1003
 pub const KEY_HOME:int = 1004
 pub const KEY_END:int = 1005
 pub const KEY_DELETE:int = 1006
+pub const KEY_PGUP:int = 1007
+pub const KEY_PGDN:int = 1008
 
 pub func eof() -> int {
     KEY_EOF
@@ -83,6 +85,14 @@ pub func delete() -> int {
     KEY_DELETE
 }
 
+pub func pgup() -> int {
+    KEY_PGUP
+}
+
+pub func pgdn() -> int {
+    KEY_PGDN
+}
+
 // Map a CSI / SS3 final byte to a KEY_* code (pure).
 // Arrows: 65 up, 66 down, 67 right, 68 left. Home/End: 72 / 70.
 // Unknown finals pass through as their own byte value.
@@ -110,7 +120,8 @@ pub func decode_csi(fin: int) -> int {
 }
 
 // Map a `~`-terminated sequence number to a KEY_* code (pure).
-// 1 = Home, 3 = Delete, 4 = End. Anything else passes through.
+// 1 = Home, 3 = Delete, 4 = End, 5 = PgUp, 6 = PgDn.
+// Anything else passes through.
 
 pub func decode_tilde(n: int) -> int {
     if n == 1 {
@@ -121,6 +132,12 @@ pub func decode_tilde(n: int) -> int {
     }
     if n == 4 {
         return KEY_END
+    }
+    if n == 5 {
+        return KEY_PGUP
+    }
+    if n == 6 {
+        return KEY_PGDN
     }
     n
 }

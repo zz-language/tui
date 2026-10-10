@@ -1,0 +1,118 @@
+// mouse — SGR mouse reporting (1006).
+//
+// Enable prints the mode escapes (gated on TTY); events arrive as
+// stdin sequences decoded here. Buttons: 0 left, 1 middle, 2 right,
+// 64 wheel-up, 65 wheel-down; release reports button + 1000.
+// Coordinates are 0-based cells.
+import std.term
+import std.vec
+
+pub struct Click {
+    b: int,
+    x: int,
+    y: int,
+    n: int,
+}
+
+pub func enable() -> bool {
+    if !term.is_tty() {
+        return false
+    }
+    print("\e[?1000h\e[?1006h")
+    term.flush()
+    true
+}
+
+pub func disable() {
+    print("\e[?1000l\e[?1006l")
+    term.flush()
+}
+
+func raw() -> int {
+    match term.read_key() {
+        .ok(k) => k
+        .err(_) => 0 - 1
+    }
+}
+
+func digits(buf: [int], i: int) -> (int, int) {
+    v := 0
+    j := i
+    while j < len(buf) && buf[j] >= 48 && buf[j] <= 57 {
+        v = v * 10 + buf[j] - 48
+        j = j + 1
+    }
+    return (v, j)
+}
+
+// Decode one SGR event: ESC [ < b ; x ; y M|m. Returns (click,
+// consumed); consumed 0 means truncated (feed more), 1 resyncs past
+// a non-mouse ESC. Malformed numbers consume the introducer.
+
+pub func decode(buf: [int]) -> Click {
+    if len(buf) == 0 {
+        return Click{b: 0 - 1, x: 0, y: 0, n: 0}
+    }
+    if buf[0] != 27 {
+        return Click{b: 0 - 1, x: 0, y: 0, n: 1}
+    }
+    if len(buf) == 1 {
+        return Click{b: 0 - 1, x: 0, y: 0, n: 0}
+    }
+    if buf[1] != 91 {
+        return Click{b: 0 - 1, x: 0, y: 0, n: 1}
+    }
+    if len(buf) == 2 {
+        return Click{b: 0 - 1, x: 0, y: 0, n: 0}
+    }
+    if buf[2] != 60 {
+        return Click{b: 0 - 1, x: 0, y: 0, n: 1}
+    }
+    (b, i1) := digits(buf, 3)
+    if i1 >= len(buf) {
+        return Click{b: 0 - 1, x: 0, y: 0, n: 0}
+    }
+    if buf[i1] != 59 {
+        return Click{b: 0 - 1, x: 0, y: 0, n: 3}
+    }
+    (x, i2) := digits(buf, i1 + 1)
+    if i2 >= len(buf) {
+        return Click{b: 0 - 1, x: 0, y: 0, n: 0}
+    }
+    if buf[i2] != 59 {
+        return Click{b: 0 - 1, x: 0, y: 0, n: 3}
+    }
+    (y, i3) := digits(buf, i2 + 1)
+    if i3 >= len(buf) {
+        return Click{b: 0 - 1, x: 0, y: 0, n: 0}
+    }
+    t := buf[i3]
+    if t != 77 && t != 109 {
+        return Click{b: 0 - 1, x: 0, y: 0, n: i3 + 1}
+    }
+    btn := b
+    if t == 109 {
+        btn = b + 1000
+    }
+    Click{b: btn, x: x - 1, y: y - 1, n: i3 + 1}
+}
+
+// Blocking read of one SGR event (enable first). EOF yields
+// b = -1; overlong garbage resolves through decode.
+
+pub func next() -> Click {
+    buf := []
+    i := 0
+    while i < 24 {
+        b := raw()
+        if b == 0 - 1 {
+            return Click{b: 0 - 1, x: 0, y: 0, n: len(buf)}
+        }
+        buf = vec.push(buf, b)
+        if b == 77 || b == 109 {
+            return decode(buf)
+        }
+        i = i + 1
+    }
+    decode(buf)
+}

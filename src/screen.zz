@@ -5,6 +5,9 @@
 // everything — `defer` it right after entering. All drawing is explicit
 // ANSI through `write`; colors come from `std.colors` (wrap strings
 // before writing them).
+import std.env
+import std.str
+import std.term
 import std.term
 
 // Enter screen mode: raw + alternate screen + hidden cursor.
@@ -33,6 +36,31 @@ pub func exit() {
         .ok(_) => term.flush()
         .err(_) => term.flush()
     }
+}
+
+// Color capability: 3 truecolor, 2 256-color, 1 basic16, 0 none.
+// NO_COLOR (even empty) wins; then COLORTERM truecolor/24bit, then
+// TERM *256color*, else basic16.
+
+pub func mode() -> int {
+    if let .some(_) = env.get_var("NO_COLOR") {
+        return 0
+    }
+    if let .some(v) = env.get_var("COLORTERM") {
+        if str.contains(v, "truecolor") {
+            return 3
+        }
+        if str.contains(v, "24bit") {
+            return 3
+        }
+    }
+    if let .some(v) = env.get_var("TERM") {
+        if str.contains(v, "256color") {
+            return 2
+        }
+        return 1
+    }
+    1
 }
 
 // True when stdin is a terminal (gate `enter` on this for clean pipes).

@@ -1,0 +1,97 @@
+// clip — system clipboard through OSC 52 (works over SSH).
+//
+// Copy is fire-and-forget printing. Paste queries the terminal and
+// waits up to ~300 ms for the response, so it needs a responding
+// terminal emulator; anything else yields .none (never blocks long,
+// never spins).
+import std.encoding
+import std.term
+
+// Copy text to the clipboard. False when stdin is no TTY.
+
+pub func copy(s: str) -> bool {
+    if !term.is_tty() {
+        return false
+    }
+    print("\e]52;c;" + std.encoding.base64_encode(s) + chr(7))
+    term.flush()
+    true
+}
+
+// Paste: ask the terminal, read until BEL. "" when the terminal does
+// not answer in time (or is no TTY) — callers treat empty as cancel.
+
+pub func paste() -> str {
+    if !term.is_tty() {
+        return ""
+    }
+    print("\e]52;c;?" + chr(7))
+    term.flush()
+    raw := ""
+    tries := 0
+    done := 0
+    while tries < 6 && done == 0 {
+        if poll_ok(50) == 0 {
+            tries = tries + 1
+        } else {
+            b := read_one()
+            if b == 7 {
+                done = 1
+            } else {
+                if b >= 0 {
+                    raw = raw + chr(b)
+                }
+            }
+        }
+    }
+    if done == 0 {
+        return ""
+    }
+    payload := after_semi(raw)
+    if payload == "" {
+        return ""
+    }
+    match std.encoding.base64_decode(payload) {
+        .ok(s) => s
+        .err(_) => ""
+    }
+}
+
+func poll_ok(ms: int) -> int {
+    match term.poll(ms) {
+        .ok(v) => {
+            if v {
+                1
+            } else {
+                0
+            }
+        }
+        .err(_) => 0
+    }
+}
+
+func read_one() -> int {
+    match term.read_key() {
+        .ok(k) => k
+        .err(_) => 0 - 1
+    }
+}
+
+// Text after the first ";" (the base64 payload of the OSC reply).
+
+func after_semi(s: str) -> str {
+    i := 0
+    while i < len(s) {
+        if s[i] == ";" {
+            out := ""
+            j := i + 1
+            while j < len(s) {
+                out = out + s[j]
+                j = j + 1
+            }
+            return out
+        }
+        i = i + 1
+    }
+    ""
+}

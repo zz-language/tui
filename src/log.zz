@@ -1,0 +1,61 @@
+// log — capped message buffer with viewport reads (move logs,
+// consoles, chat panes). Pure; the screen loop renders `view`.
+import std.vec
+
+pub struct Log {
+    lines: [str],
+    cap: int,
+}
+
+pub func blank(cap: int) -> Log {
+    Log{lines: [], cap: cap}
+}
+
+// Append, dropping oldest past cap (cap <= 0 keeps nothing).
+
+pub func push(l: Log, s: str) -> Log {
+    out := l
+    out.lines = vec.push(out.lines, s)
+    while len(out.lines) > out.cap || out.cap <= 0 {
+        out.lines = drop_head(out.lines)
+        if len(out.lines) == 0 {
+            break
+        }
+    }
+    out
+}
+
+func drop_head(a: [str]) -> [str] {
+    out := []
+    i := 1
+    while i < len(a) {
+        out = vec.push(out, a[i])
+        i = i + 1
+    }
+    out
+}
+
+// Last `height` lines ending `scroll` up from the bottom
+// (scroll 0 = live tail).
+
+pub func view(l: Log, height: int, scroll: int) -> [str] {
+    total := len(l.lines)
+    end := total - scroll
+    if end > total {
+        end = total
+    }
+    if end < 0 {
+        end = 0
+    }
+    start := end - height
+    if start < 0 {
+        start = 0
+    }
+    out := []
+    i := start
+    while i < end {
+        out = vec.push(out, l.lines[i])
+        i = i + 1
+    }
+    out
+}

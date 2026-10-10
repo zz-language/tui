@@ -1,0 +1,201 @@
+// multi — fullscreen checkbox list.
+//
+// Screen twin of the pick-several job (prompt-style picking belongs
+// to `ask`): arrows/hjkl move, Space toggles, Enter confirms the set,
+// Esc cancels everything. Long lists scroll like `menu.choose`.
+import std.colors
+import std.vec
+
+import tui.keys
+import tui.menu
+import tui.screen
+
+// Pure: toggle idx in the picked set (sorted, no duplicates).
+
+pub func toggle(picked: [int], idx: int) -> [int] {
+    out := []
+    found := 0
+    i := 0
+    while i < len(picked) {
+        if picked[i] == idx {
+            found = 1
+        } else {
+            out = vec.push(out, picked[i])
+        }
+        i = i + 1
+    }
+    if found == 1 {
+        return out
+    }
+    res := []
+    done := 0
+    i = 0
+    while i < len(out) {
+        if done == 0 && out[i] > idx {
+            res = vec.push(res, idx)
+            done = 1
+        }
+        res = vec.push(res, out[i])
+        i = i + 1
+    }
+    if done == 0 {
+        res = vec.push(res, idx)
+    }
+    res
+}
+
+func draw_win(title: str, options: [str], picked: [int], sel: int, off: int, height: int) {
+    screen.clear()
+    println(title + " (space toggles, enter confirms)")
+    println("")
+    if off > 0 {
+        println("  ↑ " + str(off) + " more")
+    }
+    i := off
+    last := off + height
+    if last > len(options) {
+        last = len(options)
+    }
+    while i < last {
+        mark := "[ ]"
+        if has(picked, i) == 1 {
+            mark = "[x]"
+        }
+        if i == sel {
+            println("> " + mark + " " + colors.reverse(options[i]))
+        } else {
+            println("  " + mark + " " + options[i])
+        }
+        i = i + 1
+    }
+    if last < len(options) {
+        println("  ↓ " + str(len(options) - last) + " more")
+    }
+    screen.flush()
+}
+
+func has(picked: [int], idx: int) -> int {
+    i := 0
+    while i < len(picked) {
+        if picked[i] == idx {
+            return 1
+        }
+        i = i + 1
+    }
+    0
+}
+
+// Fullscreen multi-pick. Returns (picked, confirmed): Esc/EOF yields
+// ([], false). Numbered comma-list fallback on pipes.
+
+pub func choose(title: str, options: [str]) -> ([int], bool) {
+    n := len(options)
+    if n == 0 {
+        return ([], true)
+    }
+    if !screen.is_tty() {
+        return choose_plain(title, options)
+    }
+    height := 10
+    sz := screen.size()
+    if sz[1] - 5 < height {
+        height = sz[1] - 5
+    }
+    if height < 3 {
+        height = 3
+    }
+    sel := 0
+    off := 0
+    picked := []
+    live := 1
+    while live == 1 {
+        if sel < off {
+            off = sel
+        }
+        if sel >= off + height {
+            off = sel - height + 1
+        }
+        draw_win(title, options, picked, sel, off, height)
+        k := keys.read()
+        if k == keys.enter() {
+            return (picked, true)
+        } else {
+            if k == keys.esc() {
+                return ([], false)
+            } else {
+                if k == keys.eof() {
+                    return ([], false)
+                } else {
+                    if k == 32 {
+                        picked = toggle(picked, sel)
+                    } else {
+                        if k == keys.pgup() {
+                            sel = sel - height
+                            if sel < 0 {
+                                sel = 0
+                            }
+                        } else {
+                            if k == keys.pgdn() {
+                                sel = sel + height
+                                if sel > n - 1 {
+                                    sel = n - 1
+                                }
+                            } else {
+                                sel = menu.step(sel, n, k)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    return ([], false)
+}
+
+func choose_plain(title: str, options: [str]) -> ([int], bool) {
+    println(title)
+    i := 0
+    while i < len(options) {
+        println(str(i + 1) + ") " + options[i])
+        i = i + 1
+    }
+    tries := 0
+    while tries < 3 {
+        s := input("Numbers (1,3): ")
+        p := parse_list(s, len(options))
+        if len(p) > 0 {
+            return (p, true)
+        }
+        tries = tries + 1
+    }
+    return ([], false)
+}
+
+func parse_list(s: str, n: int) -> [int] {
+    out := []
+    cur := 0 - 1
+    i := 0
+    while i <= len(s) {
+        c := ","
+        if i < len(s) {
+            c = s[i]
+        }
+        if c == "," || c == " " {
+            if cur >= 1 && cur <= n {
+                out = toggle(out, cur - 1)
+            }
+            cur = 0 - 1
+        } else {
+            d := int(c) ?? 0 - 1
+            if d < 0 || d > 9 {
+                return []
+            }
+            if cur < 0 {
+                cur = 0
+            }
+            cur = cur * 10 + d
+        }
+        i = i + 1
+    }
+    out
+}

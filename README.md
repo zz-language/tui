@@ -68,12 +68,20 @@ canvas.present(canvas.render(c))
 
 | Module | You get |
 |--------|---------|
-| `tui.screen` | `enter`/`exit`, `goto`, `clear`, `clear_line`, cursor hide/show, `size`, `flush`, `write`, `is_tty` |
-| `tui.keys` | Key codes, pure `decode` over byte buffers, live `read` with Esc disambiguation |
-| `tui.menu` | Wrap-around `step` core, fullscreen `choose`, numbered fallback |
+| `tui.screen` | `enter`/`exit`, `goto`, `clear`, cursor hide/show, `size`, `flush`, `write`, `is_tty`, color `mode` detect |
+| `tui.keys` | Key codes (arrows, Home/End/Delete, PgUp/PgDn), pure `decode`, live `read` with Esc disambiguation |
+| `tui.menu` | Wrap-around `step`, scrolling fullscreen `choose`, numbered fallback |
+| `tui.multi` | Fullscreen checkbox multi-pick with `toggle` core |
 | `tui.textline` | Pure `insert`/`erase`, live `edit` with cursor |
-| `tui.canvas` | Retained grid, `box`, `text`, `render`/`present`, progress `bar` |
+| `tui.tabs` | Tab strip `render` + `step` (bring your own loop) |
+| `tui.layout` | `visible`/`pad`/`center`/`trunc` width-aware string ops |
+| `tui.status` | One-line `bar(left, center, right, w)` |
+| `tui.canvas` | Retained grid, `box`/`hline`/`vline`, `text`, styled overlays, `render`/`present`, `bar` |
 | `tui.dialog` | Centered `note` + `confirm_box` with non-TTY fallbacks |
+| `tui.log` | Capped message buffer + viewport `view` |
+| `tui.mouse` | SGR mouse enable/decode/live `next` |
+| `tui.clip` | OSC 52 `copy` + timed `paste` query |
+| `tui.width` | Display widths (CJK/emoji) for column math |
 
 ## Keys at a glance
 

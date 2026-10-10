@@ -1,7 +1,11 @@
 // Gallery: non-interactive widget demo (pipe-runnable; doubles as a
 // native-parity check) plus a live menu when passed "live".
 import tui.canvas
+import tui.layout
+import tui.log
 import tui.menu
+import tui.status
+import tui.tabs
 import tui.textline
 
 func demo() {
@@ -17,6 +21,13 @@ func demo() {
         i = i + 1
     }
     println("menu step demo: " + str(menu.step(0, 3, 1002)))
+    println("tabs demo: " + tabs.render(["a", "bb"], 1))
+    println("status demo: " + status.bar("L", "C", "R", 9))
+    println("pad demo: [" + layout.pad("hi", 4) + "]")
+    l := log.blank(3)
+    l = log.push(l, "a")
+    l = log.push(l, "b")
+    println("log demo: " + str(len(log.view(l, 9, 0))))
     (t1, p1) := textline.insert("ac", 1, "b")
     println("insert demo: " + t1 + " @" + str(p1))
     (t2, p2) := textline.erase("abc", 2)
