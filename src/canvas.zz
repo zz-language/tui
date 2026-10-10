@@ -1,0 +1,152 @@
+// canvas — retained cell grid for board-style screens.
+//
+// Cells hold display strings (pre-styled with `std.colors` when you
+// like); overlays re-wrap them since ANSI styles nest. All builders
+// are pure and return a new canvas (value semantics); `present` blits
+// rows to the screen in one pass plus a flush.
+import std.vec
+
+import tui.screen
+
+pub struct Canvas {
+    w: int,
+    h: int,
+    cells: [str],
+}
+
+pub func blank(w: int, h: int, fill: str) -> Canvas {
+    cells := []
+    i := 0
+    while i < w * h {
+        cells = vec.push(cells, fill)
+        i = i + 1
+    }
+    Canvas{w: w, h: h, cells: cells}
+}
+
+// Set one cell; out-of-bounds writes are ignored.
+
+pub func set(c: Canvas, x: int, y: int, g: str) -> Canvas {
+    if x < 0 || y < 0 || x >= c.w || y >= c.h {
+        return c
+    }
+    cc := c
+    cc.cells[y * c.w + x] = g
+    cc
+}
+
+// Read one cell ("" out of bounds).
+
+pub func get(c: Canvas, x: int, y: int) -> str {
+    if x < 0 || y < 0 || x >= c.w || y >= c.h {
+        return ""
+    }
+    c.cells[y * c.w + x]
+}
+
+// Write a string along a row, clipped to the canvas.
+
+pub func text(c: Canvas, x: int, y: int, s: str) -> Canvas {
+    cc := c
+    i := 0
+    while i < len(s) {
+        xx := x + i
+        if xx >= 0 && xx < cc.w && y >= 0 && y < cc.h {
+            cc.cells[y * cc.w + xx] = s[i]
+        }
+        i = i + 1
+    }
+    cc
+}
+
+// Border box. Unicode when `pretty` is nonzero, ASCII otherwise.
+
+pub func box(c: Canvas, x: int, y: int, w: int, h: int, pretty: int) -> Canvas {
+    tl := "+"
+    tr := "+"
+    bl := "+"
+    br := "+"
+    hz := "-"
+    vt := "|"
+    if pretty != 0 {
+        tl = "┌"
+        tr = "┐"
+        bl = "└"
+        br = "┘"
+        hz = "─"
+        vt = "│"
+    }
+    cc := c
+    xi := 1
+    while xi < w - 1 {
+        cc = set(cc, x + xi, y, hz)
+        cc = set(cc, x + xi, y + h - 1, hz)
+        xi = xi + 1
+    }
+    yi := 1
+    while yi < h - 1 {
+        cc = set(cc, x, y + yi, vt)
+        cc = set(cc, x + w - 1, y + yi, vt)
+        yi = yi + 1
+    }
+    cc = set(cc, x, y, tl)
+    cc = set(cc, x + w - 1, y, tr)
+    cc = set(cc, x, y + h - 1, bl)
+    cc = set(cc, x + w - 1, y + h - 1, br)
+    cc
+}
+
+// Render to plain row strings (still carrying any ANSI styling).
+
+pub func render(c: Canvas) -> [str] {
+    rows := []
+    y := 0
+    while y < c.h {
+        line := ""
+        x := 0
+        while x < c.w {
+            line = line + c.cells[y * c.w + x]
+            x = x + 1
+        }
+        rows = vec.push(rows, line)
+        y = y + 1
+    }
+    rows
+}
+
+// Blit rows from the top-left in one pass plus a flush (no clear, so
+// frames don't flicker).
+
+pub func present(rows: [str]) {
+    screen.goto(0, 0)
+    i := 0
+    while i < len(rows) {
+        println(rows[i])
+        i = i + 1
+    }
+    screen.flush()
+}
+
+// Progress bar of width w for frac in [0, 1] (clamped).
+
+pub func bar(frac: float, w: int) -> str {
+    f := frac
+    if f < 0.0 {
+        f = 0.0
+    }
+    if f > 1.0 {
+        f = 1.0
+    }
+    n := int(f * w) ?? 0
+    s := "["
+    i := 0
+    while i < w {
+        if i < n {
+            s = s + "█"
+        } else {
+            s = s + "░"
+        }
+        i = i + 1
+    }
+    s + "]"
+}

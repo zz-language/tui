@@ -1,0 +1,29 @@
+// Gallery: non-interactive widget demo (pipe-runnable; doubles as a
+// native-parity check) plus a live menu when passed "live".
+import tui.canvas
+import tui.menu
+
+func demo() {
+    c := canvas.blank(20, 7, " ")
+    c = canvas.box(c, 0, 0, 20, 7, 1)
+    c = canvas.text(c, 2, 1, "tui gallery")
+    c = canvas.text(c, 2, 3, "progress:")
+    c = canvas.text(c, 2, 4, canvas.bar(0.625, 8))
+    rows := canvas.render(c)
+    i := 0
+    while i < len(rows) {
+        println(rows[i])
+        i = i + 1
+    }
+    println("menu step demo: " + str(menu.step(0, 3, 1002)))
+    println("gallery_ok")
+}
+
+func main(args: [str]) {
+    if len(args) > 0 && args[0] == "live" {
+        idx := menu.choose("Gallery", ["Canvas", "Keys", "Quit"])
+        println("picked: " + str(idx))
+    } else {
+        demo()
+    }
+}

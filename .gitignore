@@ -5,3 +5,6 @@ src/bin/
 **/bin/
 *.tar.gz
 .zz_test_cache
+
+# zz: fetched deps, native build outputs, compiled binaries
+bin/

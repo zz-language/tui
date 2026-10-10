@@ -1,0 +1,135 @@
+// menu — fullscreen list selection.
+//
+// `step` is the pure navigation core (unit-tested); `choose` is the
+// live loop with a numbered fallback when stdin is no TTY.
+import std.colors
+
+import tui.keys
+import tui.screen
+
+// Pure: move selection with wrap-around. Up/left (and k/h) go back,
+// down/right (and j/l) go forward. Anything else keeps `sel`.
+
+pub func step(sel: int, n: int, key: int) -> int {
+    up := 0
+    if key == keys.up() {
+        up = 1
+    }
+    if key == 107 {
+        up = 1
+    }
+    if key == keys.left() {
+        up = 1
+    }
+    if key == 104 {
+        up = 1
+    }
+    down := 0
+    if key == keys.down() {
+        down = 1
+    }
+    if key == 106 {
+        down = 1
+    }
+    if key == keys.right() {
+        down = 1
+    }
+    if key == 108 {
+        down = 1
+    }
+    if up == 1 {
+        if sel == 0 {
+            n - 1
+        } else {
+            sel - 1
+        }
+    } else {
+        if down == 1 {
+            if sel == n - 1 {
+                0
+            } else {
+                sel + 1
+            }
+        } else {
+            sel
+        }
+    }
+}
+
+func draw(title: str, options: [str], sel: int) {
+    screen.clear()
+    println(title)
+    println("")
+    i := 0
+    while i < len(options) {
+        if i == sel {
+            println("> " + colors.reverse(options[i]))
+        } else {
+            println("  " + options[i])
+        }
+        i = i + 1
+    }
+    screen.flush()
+}
+
+// Numbered fallback for pipes: three bad reads (including EOF) bail
+// out with -1 instead of spinning.
+
+func choose_plain(title: str, options: [str]) -> int {
+    println(title)
+    i := 0
+    while i < len(options) {
+        println(str(i + 1) + ") " + options[i])
+        i = i + 1
+    }
+    tries := 0
+    while tries < 3 {
+        s := input("Number: ")
+        v := int(s)
+        match v {
+            .some(n) => {
+                if n >= 1 && n <= len(options) {
+                    return n - 1
+                }
+                0
+            }
+            .none => 0
+        }
+        tries = tries + 1
+    }
+    0 - 1
+}
+
+// Fullscreen menu. Returns the chosen index, or -1 on Esc / EOF /
+// empty options. Marker plus reverse highlight so it reads on
+// colorless terminals too.
+
+pub func choose(title: str, options: [str]) -> int {
+    n := len(options)
+    if n == 0 {
+        return 0 - 1
+    }
+    if !screen.is_tty() {
+        return choose_plain(title, options)
+    }
+    sel := 0
+    live := 1
+    while live == 1 {
+        draw(title, options, sel)
+        k := keys.read()
+        if k == keys.enter() {
+            return sel
+        } else {
+            if k == keys.esc() {
+                return 0 - 1
+            } else {
+                if k == keys.eof() {
+                    return 0 - 1
+                } else {
+                    sel = step(sel, n, k)
+                }
+            }
+        }
+    }
+    0 - 1
+}

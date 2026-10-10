@@ -1,0 +1,113 @@
+// textline — single-line text editing.
+//
+// Pure buffer ops (`insert`, `erase`) plus a live `edit` loop. The
+// cursor is tracked as an index; rendering keeps it under the right
+// cell with a horizontal-absolute escape.
+import tui.keys
+import tui.screen
+
+// Pure: insert ch at cursor. Returns (text, cursor).
+pub func insert(buf: str, pos: int, ch: str) -> (str, int) {
+    out := ""
+    i := 0
+    while i < pos {
+        out = out + buf[i]
+        i = i + 1
+    }
+    out = out + ch
+    while i < len(buf) {
+        out = out + buf[i]
+        i = i + 1
+    }
+    return (out, pos + 1)
+}
+
+// Pure: backspace at cursor (deletes the char before it).
+// Returns (text, cursor); at 0 nothing happens.
+pub func erase(buf: str, pos: int) -> (str, int) {
+    if pos <= 0 {
+        return (buf, 0)
+    }
+    out := ""
+    i := 0
+    while i < pos - 1 {
+        out = out + buf[i]
+        i = i + 1
+    }
+    i = pos
+    while i < len(buf) {
+        out = out + buf[i]
+        i = i + 1
+    }
+    return (out, pos - 1)
+}
+
+// Live edit at the current cursor line. Returns (text, confirmed):
+// Enter confirms, Esc/EOF cancels back to `initial`. Piped stdin falls
+// back to one plain `input()` read.
+pub func edit(prompt: str, initial: str) -> (str, bool) {
+    if !screen.is_tty() {
+        s := input(prompt)
+        return (s, true)
+    }
+    buf := initial
+    pos := len(initial)
+    screen.show()
+    live := 1
+    out := initial
+    confirmed := false
+    while live == 1 {
+        print("\r" + prompt + buf + " ")
+        print("\e[" + str(len(prompt) + pos + 1) + "G")
+        screen.flush()
+        k := keys.read()
+        if k == keys.enter() {
+            out = buf
+            confirmed = true
+            live = 0
+        } else {
+            if k == keys.esc() {
+                live = 0
+            } else {
+                if k == keys.eof() {
+                    live = 0
+                } else {
+                    if k == keys.backspace() {
+                        nb, np := erase(buf, pos)
+                        buf = nb
+                        pos = np
+                    } else {
+                        if k == keys.left() {
+                            if pos > 0 {
+                                pos = pos - 1
+                            }
+                        } else {
+                            if k == keys.right() {
+                                if pos < len(buf) {
+                                    pos = pos + 1
+                                }
+                            } else {
+                                if k == keys.home() {
+                                    pos = 0
+                                } else {
+                                    if k == keys.end() {
+                                        pos = len(buf)
+                                    } else {
+                                        if k >= 32 && k <= 126 {
+                                            nb, np := insert(buf, pos, chr(k))
+                                            buf = nb
+                                            pos = np
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    screen.hide()
+    println("")
+    return (out, confirmed)
+}

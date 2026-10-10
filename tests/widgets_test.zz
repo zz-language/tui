@@ -1,0 +1,65 @@
+// Widget core tests: navigation steps, buffer ops, canvas builders.
+// All pure — no terminal needed.
+import tui.canvas
+import tui.menu
+import tui.textline
+
+@test
+func menu_step_wraps() {
+    assert_eq(menu.step(0, 4, 1002), 3)
+    assert_eq(menu.step(3, 4, 1002), 2)
+    assert_eq(menu.step(3, 4, 1003), 0)
+    assert_eq(menu.step(1, 4, 106), 2)
+    assert_eq(menu.step(0, 4, 107), 3)
+    assert_eq(menu.step(2, 4, 13), 2)
+}
+
+@test
+func buffer_insert_erase() {
+    (t1, p1) := textline.insert("ac", 1, "b")
+    assert_eq(t1, "abc")
+    assert_eq(p1, 2)
+    (t2, p2) := textline.insert("", 0, "z")
+    assert_eq(t2, "z")
+    assert_eq(p2, 1)
+    (t3, p3) := textline.erase("abc", 2)
+    assert_eq(t3, "ac")
+    assert_eq(p3, 1)
+    (t4, p4) := textline.erase("abc", 0)
+    assert_eq(t4, "abc")
+    assert_eq(p4, 0)
+}
+
+@test
+func canvas_builders() {
+    c := canvas.blank(4, 2, ".")
+    assert_eq(canvas.get(c, 0, 0), ".")
+    assert_eq(canvas.get(c, 9, 9), "")
+    c = canvas.set(c, 1, 0, "X")
+    assert_eq(canvas.get(c, 1, 0), "X")
+    c = canvas.set(c, 9, 9, "X")
+    assert_eq(canvas.get(c, 0, 1), ".")
+    c = canvas.text(c, 0, 1, "hi")
+    rows := canvas.render(c)
+    assert_eq(len(rows), 2)
+    assert_eq(rows[0], ".X..")
+    assert_eq(rows[1], "hi..")
+}
+
+@test
+func canvas_box_ascii() {
+    c := canvas.blank(5, 4, " ")
+    c = canvas.box(c, 0, 0, 5, 4, 0)
+    rows := canvas.render(c)
+    assert_eq(rows[0], "+---+")
+    assert_eq(rows[1], "|   |")
+    assert_eq(rows[3], "+---+")
+}
+
+@test
+func progress_bar_pins() {
+    assert_eq(canvas.bar(0.0, 4), "[░░░░]")
+    assert_eq(canvas.bar(0.5, 4), "[██░░]")
+    assert_eq(canvas.bar(1.0, 2), "[██]")
+    assert_eq(canvas.bar(2.0, 2), "[██]")
+}

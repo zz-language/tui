@@ -5,8 +5,20 @@ dispatch single keys. Where `ask` answers one question and restores
 the terminal, `tui` runs the whole show — board games, dashboards,
 editors.
 
+## Install
+
+```bash
+zz add tui
+```
+
+(No released version yet — until 0.1.0 ships, depend by path:)
+
+```bash
+zz add tui --path ~/Projects/zz-tui
+```
+
 Requires a toolchain with `std.term.poll` (post-0.2.2 dev line; the
-released 0.2.2 `d_zz` does not have it yet).
+released 0.2.2 binary does not have it yet).
 
 ```zz
 import tui.screen

@@ -1,0 +1,83 @@
+// dialog — centered popups over a screen app.
+//
+// `note` shows lines until any key; `confirm_box` asks yes/no.
+// Piped stdin falls back to printed lines plus plain input.
+import tui.canvas
+import tui.keys
+import tui.screen
+
+func dlg(c: Canvas, lines: [str]) -> Canvas {
+    w := 0
+    i := 0
+    while i < len(lines) {
+        if len(lines[i]) > w {
+            w = len(lines[i])
+        }
+        i = i + 1
+    }
+    sz := screen.size()
+    bw := w + 4
+    bh := len(lines) + 4
+    bx := (sz[0] - bw) / 2
+    by := (sz[1] - bh) / 2
+    if bx < 0 {
+        bx = 0
+    }
+    if by < 0 {
+        by = 0
+    }
+    cc := canvas.box(c, bx, by, bw, bh, 1)
+    j := 0
+    while j < len(lines) {
+        cc = canvas.text(cc, bx + 2, by + 2 + j, lines[j])
+        j = j + 1
+    }
+    cc
+}
+
+// Show lines in a centered box until any key. Returns the key
+// (Enter on the plain fallback).
+
+pub func note(lines: [str]) -> int {
+    if !screen.is_tty() {
+        i := 0
+        while i < len(lines) {
+            println(lines[i])
+            i = i + 1
+        }
+        s := input("[Enter] ")
+        return keys.enter()
+    }
+    sz := screen.size()
+    c := canvas.blank(sz[0], sz[1], " ")
+    cc := dlg(c, lines)
+    canvas.present(canvas.render(cc))
+    keys.read()
+}
+
+// Yes/no box. y/Y/Enter confirm; n/N/Esc/EOF decline.
+
+pub func confirm_box(msg: str) -> bool {
+    if !screen.is_tty() {
+        s := input(msg + " [y/N] ")
+        if s == "y" || s == "Y" {
+            return true
+        }
+        return false
+    }
+    sz := screen.size()
+    c := canvas.blank(sz[0], sz[1], " ")
+    cc := dlg(c, [msg, "", "(y)es / (n)o"])
+    canvas.present(canvas.render(cc))
+    live := 1
+    while live == 1 {
+        k := keys.read()
+        if k == 121 || k == 89 || k == keys.enter() {
+            return true
+        }
+        if k == 110 || k == 78 || k == keys.esc() || k == keys.eof() {
+            return false
+        }
+    }
+    false
+}
