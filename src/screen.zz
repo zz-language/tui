@@ -1,0 +1,87 @@
+// screen — terminal screen ownership for retained-mode apps.
+//
+// Lifecycle: `enter()` switches to raw mode + the alternate screen and
+// hides the cursor (false when there is no TTY); `exit()` restores
+// everything — `defer` it right after entering. All drawing is explicit
+// ANSI through `write`; colors come from `std.colors` (wrap strings
+// before writing them).
+import std.term
+
+// Enter screen mode: raw + alternate screen + hidden cursor.
+// Returns false (leaving the terminal untouched) when stdin is no TTY.
+
+pub func screen.enter() -> bool {
+    match term.enable_raw() {
+        .ok(_) => {
+            print("\e[?1049h\e[H\e[?25l")
+            term.flush()
+            true
+        }
+        .err(_) => false
+    }
+}
+
+// Leave screen mode: cursor back, main screen back, cooked mode.
+// Safe to call unconditionally (idempotent cleanup).
+
+pub func screen.exit() {
+    print("\e[?25h\e[?1049l")
+    term.flush()
+    _ := term.disable_raw()
+}
+
+// True when stdin is a terminal (gate `enter` on this for clean pipes).
+
+pub func screen.is_tty() -> bool {
+    term.is_tty()
+}
+
+// Terminal size as [cols, rows]; [80, 24] when unknown.
+
+pub func screen.size() -> [int] {
+    match term.get_size() {
+        .ok(sz) => sz
+        .err(_) => [80, 24]
+    }
+}
+
+// Move the cursor (0-based cell coordinates).
+
+pub func screen.goto(x: int, y: int) {
+    print("\e[{y + 1};{x + 1}H")
+}
+
+// Clear the whole alternate screen, cursor home.
+
+pub func screen.clear() {
+    print("\e[2J\e[H")
+}
+
+// Clear the current line.
+
+pub func screen.clear_line() {
+    print("\e[2K")
+}
+
+// Hide / show the text cursor.
+
+pub func screen.hide() {
+    print("\e[?25l")
+}
+
+pub func screen.show() {
+    print("\e[?25h")
+}
+
+// Push buffered output now (renders without a trailing newline would
+// otherwise sit buffered while input blocks).
+
+pub func screen.flush() {
+    term.flush()
+}
+
+// Write text at the cursor with no newline.
+
+pub func screen.write(s: str) {
+    print(s)
+}

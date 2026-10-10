@@ -1,0 +1,69 @@
+// Hermetic key-decoding tests: `decode` is pure (no I/O), so the full
+// table runs under `zz test` with no terminal.
+import tui.keys as keys
+
+@test
+func arrows_decode() {
+    ku, nu := keys.decode([27, 91, 65])
+    assert_eq(ku, 1002)
+    assert_eq(nu, 3)
+    kd, nd := keys.decode([27, 91, 66])
+    assert_eq(kd, 1003)
+    assert_eq(nd, 3)
+    kr, nr := keys.decode([27, 91, 67])
+    assert_eq(kr, 1001)
+    assert_eq(nr, 3)
+    kl, nl := keys.decode([27, 91, 68])
+    assert_eq(kl, 1000)
+    assert_eq(nl, 3)
+}
+
+@test
+func singles_pass_through() {
+    ke, ne := keys.decode([13])
+    assert_eq(ke, 13)
+    assert_eq(ne, 1)
+    ks, ns := keys.decode([32])
+    assert_eq(ks, 32)
+    assert_eq(ns, 1)
+    ka, na := keys.decode([97])
+    assert_eq(ka, 97)
+    assert_eq(na, 1)
+}
+
+@test
+func truncated_needs_more() {
+    k0, n0 := keys.decode([])
+    assert_eq(k0, 0 - 3)
+    assert_eq(n0, 0)
+    k1, n1 := keys.decode([27])
+    assert_eq(k1, 0 - 3)
+    assert_eq(n1, 0)
+    k2, n2 := keys.decode([27, 91])
+    assert_eq(k2, 0 - 3)
+    assert_eq(n2, 0)
+}
+
+@test
+func lone_esc_resolves() {
+    kx, nx := keys.decode([27, 120])
+    assert_eq(kx, 27)
+    assert_eq(nx, 1)
+}
+
+@test
+func tilde_sequences_decode() {
+    kd3, nn3 := keys.decode([27, 91, 51, 126])
+    assert_eq(kd3, 1006)
+    assert_eq(nn3, 4)
+    kh1, nn1 := keys.decode([27, 91, 49, 126])
+    assert_eq(kh1, 1004)
+    assert_eq(nn1, 4)
+}
+
+@test
+func csi_helpers_match() {
+    assert_eq(keys.decode_csi(65), 1002)
+    assert_eq(keys.decode_csi(70), 1005)
+    assert_eq(keys.decode_tilde(4), 1005)
+}

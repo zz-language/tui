@@ -1,0 +1,222 @@
+// keys — key codes plus live decoding over `std.term`.
+//
+// Numbering matches the `ask` package (`ask/keys.zz`) so both can be
+// learned once: arrows 1000-1003, Home/End/Delete 1004-1006, EOF -1.
+// Two layers:
+//   - `decode(buf)` is pure (no I/O): turn a byte buffer into
+//     `(key, consumed)`. `consumed == 0` means "need more bytes".
+//     Fully unit-testable — see `tests/keys_test.zz`.
+//   - `read()` is live: one logical key from the terminal. A lone ESC
+//     returns immediately (50 ms `poll` for the rest); closed stdin
+//     returns `eof()` instead of blocking or spinning.
+import std.term
+
+pub const KEY_EOF:int = -1
+pub const KEY_MORE:int = -3
+pub const KEY_CTRL_C:int = 3
+pub const KEY_TAB:int = 9
+pub const KEY_ENTER:int = 13
+pub const KEY_ESC:int = 27
+pub const KEY_SPACE:int = 32
+pub const KEY_BACKSPACE:int = 127
+pub const KEY_LEFT:int = 1000
+pub const KEY_RIGHT:int = 1001
+pub const KEY_UP:int = 1002
+pub const KEY_DOWN:int = 1003
+pub const KEY_HOME:int = 1004
+pub const KEY_END:int = 1005
+pub const KEY_DELETE:int = 1006
+
+pub func keys.eof() -> int {
+    KEY_EOF
+}
+
+pub func keys.ctrl_c() -> int {
+    KEY_CTRL_C
+}
+
+pub func keys.tab() -> int {
+    KEY_TAB
+}
+
+pub func keys.enter() -> int {
+    KEY_ENTER
+}
+
+pub func keys.esc() -> int {
+    KEY_ESC
+}
+
+pub func keys.space() -> int {
+    KEY_SPACE
+}
+
+pub func keys.backspace() -> int {
+    KEY_BACKSPACE
+}
+
+pub func keys.left() -> int {
+    KEY_LEFT
+}
+
+pub func keys.right() -> int {
+    KEY_RIGHT
+}
+
+pub func keys.up() -> int {
+    KEY_UP
+}
+
+pub func keys.down() -> int {
+    KEY_DOWN
+}
+
+pub func keys.home() -> int {
+    KEY_HOME
+}
+
+pub func keys.end() -> int {
+    KEY_END
+}
+
+pub func keys.delete() -> int {
+    KEY_DELETE
+}
+
+// Map a CSI / SS3 final byte to a KEY_* code (pure).
+// Arrows: 65 up, 66 down, 67 right, 68 left. Home/End: 72 / 70.
+// Unknown finals pass through as their own byte value.
+
+pub func keys.decode_csi(fin: int) -> int {
+    if fin == 65 {
+        return KEY_UP
+    }
+    if fin == 66 {
+        return KEY_DOWN
+    }
+    if fin == 67 {
+        return KEY_RIGHT
+    }
+    if fin == 68 {
+        return KEY_LEFT
+    }
+    if fin == 72 {
+        return KEY_HOME
+    }
+    if fin == 70 {
+        return KEY_END
+    }
+    fin
+}
+
+// Map a `~`-terminated sequence number to a KEY_* code (pure).
+// 1 = Home, 3 = Delete, 4 = End. Anything else passes through.
+
+pub func keys.decode_tilde(n: int) -> int {
+    if n == 1 {
+        return KEY_HOME
+    }
+    if n == 3 {
+        return KEY_DELETE
+    }
+    if n == 4 {
+        return KEY_END
+    }
+    n
+}
+
+// Decode a byte buffer into (key, consumed). `consumed == 0` (with key
+// KEY_MORE) means the buffer holds a truncated sequence — feed more
+// bytes. A leading ESC followed by a non-introducer resolves to a lone
+// ESC with 1 consumed; the rest stays for the next call.
+
+pub func keys.decode(buf: [int]) -> (int, int) {
+    n := len(buf)
+    if n == 0 {
+        return (KEY_MORE, 0)
+    }
+    b := buf[0]
+    if b != 27 {
+        return (b, 1)
+    }
+    if n < 2 {
+        return (KEY_MORE, 0)
+    }
+    b2 := buf[1]
+    if b2 != 91 && b2 != 79 {
+        return (27, 1)
+    }
+    if n < 3 {
+        return (KEY_MORE, 0)
+    }
+    b3 := buf[2]
+    if b3 >= 49 && b3 <= 52 {
+        if n < 4 {
+            return (KEY_MORE, 0)
+        }
+        if buf[3] == 126 {
+            return (keys.decode_tilde(b3 - 48), 4)
+        }
+        return (keys.decode_csi(b3), 3)
+    }
+    (keys.decode_csi(b3), 3)
+}
+
+// One raw byte from stdin, or -1 when the read fails (closed stdin).
+
+func raw() -> int {
+    match term.read_key() {
+        .ok(k) => k
+        .err(_) => -1
+    }
+}
+
+// Read one logical key: printable bytes pass through, `ESC [` / `ESC O`
+// sequences decode to KEY_* codes, a lone ESC returns KEY_ESC without
+// blocking (50 ms poll), failures return KEY_EOF.
+
+pub func keys.read() -> int {
+    b := raw()
+    if b != 27 {
+        return b
+    }
+    match term.poll(50) {
+        .ok(v) => {
+            if v {
+                return read_seq()
+            }
+            27
+        }
+        .err(_) => 27
+    }
+}
+
+func read_seq() -> int {
+    b2 := raw()
+    if b2 == 91 {
+        return read_csi()
+    }
+    if b2 == 79 {
+        b3 := raw()
+        if b3 == -1 {
+            return 27
+        }
+        return keys.decode_csi(b3)
+    }
+    27
+}
+
+func read_csi() -> int {
+    b3 := raw()
+    if b3 == -1 {
+        return 27
+    }
+    if b3 >= 49 && b3 <= 52 {
+        b4 := raw()
+        if b4 == 126 {
+            return keys.decode_tilde(b3 - 48)
+        }
+        return keys.decode_csi(b3)
+    }
+    keys.decode_csi(b3)
+}

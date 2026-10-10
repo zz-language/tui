@@ -1,0 +1,21 @@
+// tui — retained-mode terminal UI kit. Pure ZZ on `std.term`.
+//
+// Where `ask` answers one question and restores the terminal, `tui`
+// owns the screen: raw mode across frames, full redraws, single-key
+// dispatch, popups. Import what you need:
+//
+//   import tui.keys
+//   import tui.screen
+//
+//   screen.enter()
+//   defer screen.exit()
+//   k := keys.read()
+//   if k == keys.up() { println("up") }
+//
+// Every input path returns instead of spinning: closed stdin yields
+// `keys.eof()` on the first failed read. Non-TTY callers should branch
+// on `screen.is_tty()` before entering.
+
+pub func tui.version() -> str {
+    "0.1.0"
+}

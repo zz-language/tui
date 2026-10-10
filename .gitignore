@@ -1,0 +1,7 @@
+# zz: fetched deps, native build outputs, compiled binaries
+vendor/
+build/
+src/bin/
+**/bin/
+*.tar.gz
+.zz_test_cache

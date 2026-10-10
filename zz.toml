@@ -1,0 +1,9 @@
+[package]
+name = "tui"
+version = "0.1.0"
+description = "Retained-mode terminal UI kit. Screen control, key decoding, testable input."
+license = "MIT"
+category = "utilities"
+keywords = ["tui", "terminal", "screen", "keyboard", "interactive", "cli"]
+
+[dependencies]
