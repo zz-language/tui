@@ -1,9 +1,12 @@
-# tui
+```
+┌────────────────────────────────────────┐
+│  tui — own the terminal                │
+│  screens, keys, widgets. pure ZZ.      │
+└────────────────────────────────────────┘
+```
 
-Retained-mode terminal UI kit for ZZ: own the screen, redraw frames,
-dispatch single keys. Where `ask` answers one question and restores
-the terminal, `tui` runs the whole show — board games, dashboards,
-editors.
+Where `ask` answers one question and restores the terminal, `tui`
+runs the whole show — board games, dashboards, editors, file browsers.
 
 ## Install
 
@@ -11,48 +14,97 @@ editors.
 zz add tui
 ```
 
-(No released version yet — until 0.1.0 ships, depend by path:)
+> Requires a dev toolchain with `std.term.poll` (the released
+> toolchain does not have it yet — build `zz` from source).
 
-```bash
-zz add tui --path ~/Projects/zz-tui
-```
-
-Requires a toolchain with `std.term.poll` (post-0.2.2 dev line; the
-released 0.2.2 binary does not have it yet).
+## Hello, screen
 
 ```zz
 import tui.screen
 import tui.keys
 
-screen.enter()
-defer screen.exit()
-k := keys.read()
-if k == keys.up() { println("up") }
+func main() {
+    screen.enter()
+    defer screen.exit()
+    screen.clear()
+    println("press q to quit")
+    live := 1
+    while live == 1 {
+        if keys.read() == 113 {
+            live = 0
+        }
+    }
+}
+```
+
+## One function per need
+
+```zz
+import tui.menu
+import tui.textline
+import tui.dialog
+import tui.canvas
+
+// Fullscreen picker. Arrows/hjkl + Enter. -1 on Esc.
+idx := menu.choose("Pick your hero", ["mage", "rogue", "bard"])
+
+// Editable line. Returns (text, confirmed).
+(name, ok) := textline.edit("Name: ", "")
+
+// Centered yes/no over your screen.
+if dialog.confirm_box("Overwrite save?") {
+    println("overwritten")
+}
+
+// Retained grid: draw anywhere, blit once.
+c := canvas.blank(80, 24, " ")
+c = canvas.box(c, 0, 0, 20, 7, 1)
+c = canvas.text(c, 2, 1, "quest log")
+c = canvas.text(c, 2, 3, canvas.bar(0.625, 8))
+canvas.present(canvas.render(c))
 ```
 
 ## Modules
 
-| Module | Contents |
-|--------|----------|
-| `tui.screen` | `enter`/`exit`, `goto`, `clear`, `clear_line`, hide/show cursor, `size`, `flush`, `write`, `is_tty` |
+| Module | You get |
+|--------|---------|
+| `tui.screen` | `enter`/`exit`, `goto`, `clear`, `clear_line`, cursor hide/show, `size`, `flush`, `write`, `is_tty` |
 | `tui.keys` | Key codes, pure `decode` over byte buffers, live `read` with Esc disambiguation |
+| `tui.menu` | Wrap-around `step` core, fullscreen `choose`, numbered fallback |
+| `tui.textline` | Pure `insert`/`erase`, live `edit` with cursor |
+| `tui.canvas` | Retained grid, `box`, `text`, `render`/`present`, progress `bar` |
+| `tui.dialog` | Centered `note` + `confirm_box` with non-TTY fallbacks |
 
-## Key codes
+## Keys at a glance
 
 Singles pass through as their byte (`13` Enter, `32` Space, `127`
-Backspace, `3` Ctrl+C). Arrows decode to `1000`-`1003` (same numbering
-as `ask`), Home/End/Delete to `1004`-`1006`. `-1` is EOF/closed stdin
-(returned, never spun on), `-3` from `decode` means "need more bytes".
+Backspace, `3` Ctrl+C). Arrows decode to `1000`–`1003`, Home/End/Delete
+to `1004`–`1006` — the same numbering as `ask`. `-1` is EOF, returned,
+never spun on. Full table: [`docs/keys.md`](docs/keys.md).
 
-## Rules the package lives by
+## Rules this package lives by
 
-- Every input path returns: closed stdin yields EOF on the first
-  failed read. No retry loops against no input.
-- Non-TTY callers branch on `screen.is_tty()` — nothing here assumes
-  a terminal.
-- `defer screen.exit()` restores cooked mode on every exit path.
+- **Every input path returns.** Closed stdin yields EOF on the first
+  failed read. Piped stdin degrades to line mode. Nothing spins.
+- **No TTY assumed.** Branch on `screen.is_tty()`; everything works
+  (uglier) over a pipe, so examples stay testable.
+- **Pure cores, thin live shells.** Navigation, buffer ops, rendering
+  and decoding are pure functions with `zz test` coverage; terminal
+  I/O lives in small wrappers around them.
+- **Not a framework.** No app object, no prescribed loop — composable
+  pieces you wire yourself. (A wrapper framework over `table`, `ask`
+  and `tui` is a separate future package.)
+
+## Docs
+
+- [`docs/getting-started.md`](docs/getting-started.md) — first app in ten minutes
+- [`docs/api.md`](docs/api.md) — every function, every signature
+- [`docs/keys.md`](docs/keys.md) — keycode table + decoding guide
+- [`docs/cookbook.md`](docs/cookbook.md) — game loop, dialogs, progress, quit-confirm
 
 ## Status
 
-0.1.0: screen + keys + hermetic decode tests. Widgets (menu, textline,
-canvas) land in 0.2.0.
+Screen + keys + menu + textline + canvas + dialog, all tested. See
+[`docs/getting-started.md`](docs/getting-started.md) for what's next.
+
+MIT — see [LICENSE](LICENSE).
