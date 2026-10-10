@@ -1,9 +1,14 @@
 // canvas — retained cell grid for board-style screens.
 //
-// Cells hold display strings (pre-styled with `std.colors` when you
-// like); overlays re-wrap them since ANSI styles nest. All builders
-// are pure and return a new canvas (value semantics); `present` blits
-// rows to the screen in one pass plus a flush.
+// Representation: one string per row, plus styled overlays. Drawing
+// touches only the rows it changes (a splice per row), so boxes, text
+// runs, and frames cost O(rows), never O(cells) — no full-grid copy
+// per cell. Overlays fully replace their target cell at render, so
+// overlay targets must be plain single-char cells; static chrome may
+// carry ANSI styling directly since it is never re-addressed.
+//
+// Glyphs should be single-cell (ASCII or symbols like ♞); wide CJK
+// or emoji break column alignment (widths are not measured).
 import std.vec
 
 import tui.screen
@@ -11,17 +16,55 @@ import tui.screen
 pub struct Canvas {
     w: int,
     h: int,
-    cells: [str],
+    rows: [str],
+    ox: [int],
+    oy: [int],
+    og: [str],
+}
+
+func rep(g: str, n: int) -> str {
+    s := ""
+    i := 0
+    while i < n {
+        s = s + g
+        i = i + 1
+    }
+    s
 }
 
 pub func blank(w: int, h: int, fill: str) -> Canvas {
-    cells := []
+    rows := []
+    y := 0
+    while y < h {
+        rows = vec.push(rows, rep(fill, w))
+        y = y + 1
+    }
+    Canvas{w: w, h: h, rows: rows, ox: [], oy: [], og: []}
+}
+
+// Splice s at char index: left + mid + right (clipped to [0, len]).
+
+func splice(s: str, at: int, mid: str, drop: int) -> str {
+    start := at
+    if start < 0 {
+        start = 0
+    }
+    if start > len(s) {
+        start = len(s)
+    }
+    left := ""
     i := 0
-    while i < w * h {
-        cells = vec.push(cells, fill)
+    while i < start {
+        left = left + s[i]
         i = i + 1
     }
-    Canvas{w: w, h: h, cells: cells}
+    right := ""
+    i = start + drop
+    while i < len(s) {
+        right = right + s[i]
+        i = i + 1
+    }
+    left + mid + right
 }
 
 // Set one cell; out-of-bounds writes are ignored.
@@ -31,7 +74,7 @@ pub func set(c: Canvas, x: int, y: int, g: str) -> Canvas {
         return c
     }
     cc := c
-    cc.cells[y * c.w + x] = g
+    cc.rows[y] = splice(cc.rows[y], x, g, 1)
     cc
 }
 
@@ -41,25 +84,39 @@ pub func get(c: Canvas, x: int, y: int) -> str {
     if x < 0 || y < 0 || x >= c.w || y >= c.h {
         return ""
     }
-    c.cells[y * c.w + x]
+    c.rows[y][x]
 }
 
-// Write a string along a row, clipped to the canvas.
+// Write a string along a row in one splice, clipped to the canvas.
 
 pub func text(c: Canvas, x: int, y: int, s: str) -> Canvas {
-    cc := c
+    if y < 0 || y >= c.h {
+        return c
+    }
+    start := x
+    if start < 0 {
+        start = 0
+    }
+    if start >= c.w {
+        return c
+    }
+    keep := c.w - start
+    if len(s) < keep {
+        keep = len(s)
+    }
+    show := ""
     i := 0
-    while i < len(s) {
-        xx := x + i
-        if xx >= 0 && xx < cc.w && y >= 0 && y < cc.h {
-            cc.cells[y * cc.w + xx] = s[i]
-        }
+    while i < keep {
+        show = show + s[i]
         i = i + 1
     }
+    cc := c
+    cc.rows[y] = splice(cc.rows[y], start, show, keep)
     cc
 }
 
 // Border box. Unicode when `pretty` is nonzero, ASCII otherwise.
+// One splice per row — no per-cell copies.
 
 pub func box(c: Canvas, x: int, y: int, w: int, h: int, pretty: int) -> Canvas {
     tl := "+"
@@ -77,41 +134,82 @@ pub func box(c: Canvas, x: int, y: int, w: int, h: int, pretty: int) -> Canvas {
         vt = "│"
     }
     cc := c
-    xi := 1
-    while xi < w - 1 {
-        cc = set(cc, x + xi, y, hz)
-        cc = set(cc, x + xi, y + h - 1, hz)
-        xi = xi + 1
+    if w >= 2 && h >= 1 {
+        cc = text(cc, x + 1, y, rep(hz, w - 2))
+        cc = text(cc, x + 1, y + h - 1, rep(hz, w - 2))
     }
+    cc = set(cc, x, y, tl)
+    cc = set(cc, x + w - 1, y, tr)
+    cc = set(cc, x, y + h - 1, bl)
+    cc = set(cc, x + w - 1, y + h - 1, br)
     yi := 1
     while yi < h - 1 {
         cc = set(cc, x, y + yi, vt)
         cc = set(cc, x + w - 1, y + yi, vt)
         yi = yi + 1
     }
-    cc = set(cc, x, y, tl)
-    cc = set(cc, x + w - 1, y, tr)
-    cc = set(cc, x, y + h - 1, bl)
-    cc = set(cc, x + w - 1, y + h - 1, br)
     cc
 }
 
-// Render to plain row strings (still carrying any ANSI styling).
+// Horizontal run, clipped.
+
+pub func hline(c: Canvas, x: int, y: int, n: int, g: str) -> Canvas {
+    text(c, x, y, rep(g, n))
+}
+
+// Vertical run, clipped.
+
+pub func vline(c: Canvas, x: int, y: int, n: int, g: str) -> Canvas {
+    cc := c
+    i := 0
+    while i < n {
+        cc = set(cc, x, y + i, g)
+        i = i + 1
+    }
+    cc
+}
+
+// Rows with overlays applied. Base rows stay untouched in `c`.
 
 pub func render(c: Canvas) -> [str] {
-    rows := []
-    y := 0
-    while y < c.h {
-        line := ""
-        x := 0
-        while x < c.w {
-            line = line + c.cells[y * c.w + x]
-            x = x + 1
-        }
-        rows = vec.push(rows, line)
-        y = y + 1
+    out := c.rows
+    i := 0
+    while i < len(c.ox) {
+        out = apply_ov(out, c.w, c.h, c.ox[i], c.oy[i], c.og[i])
+        i = i + 1
     }
-    rows
+    out
+}
+
+func apply_ov(rows: [str], w: int, h: int, x: int, y: int, g: str) -> [str] {
+    if x < 0 || y < 0 || x >= w || y >= h {
+        return rows
+    }
+    out := rows
+    out[y] = splice(out[y], x, g, 1)
+    out
+}
+
+// Record a styled overlay: at render, og fully REPLACES the cell at
+// (x, y), so overlay targets must be plain single-char cells. Appends
+// only (O(1)); overlays apply in order, later wins on overlap.
+
+pub func styled(c: Canvas, x: int, y: int, g: str) -> Canvas {
+    cc := c
+    cc.ox = vec.push(cc.ox, x)
+    cc.oy = vec.push(cc.oy, y)
+    cc.og = vec.push(cc.og, g)
+    cc
+}
+
+// Drop all overlays (fresh frame on the same grid).
+
+pub func clear_ov(c: Canvas) -> Canvas {
+    cc := c
+    cc.ox = []
+    cc.oy = []
+    cc.og = []
+    cc
 }
 
 // Blit rows from the top-left in one pass plus a flush (no clear, so

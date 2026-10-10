@@ -71,8 +71,12 @@ Enter, Esc. The cursor tracks via horizontal-absolute positioning.
 
 ## `tui.canvas`
 
-`Canvas` is `{ w: int, h: int, cells: [str] }` (value semantics —
-builders return a new canvas).
+`Canvas` is `{ w, h, rows, ox, oy, og }` (value semantics —
+builders return a new canvas). Rows hold plain glyphs; `styled`
+overlays fully replace their target cell at render, so overlay
+targets must be single-char cells while static chrome may carry ANSI
+directly. Drawing touches only changed rows: boxes and frames cost
+O(rows), single cells and overlays O(1).
 
 | Function | Signature | Notes |
 |----------|-----------|-------|
@@ -80,7 +84,10 @@ builders return a new canvas).
 | `set` | `(c: Canvas, x: int, y: int, g: str) -> Canvas` | One cell; OOB ignored |
 | `get` | `(c: Canvas, x: int, y: int) -> str` | One cell; `""` OOB |
 | `text` | `(c: Canvas, x: int, y: int, s: str) -> Canvas` | Row string, clipped |
-| `box` | `(c: Canvas, x: int, y: int, w: int, h: int, pretty: int) -> Canvas` | Border; nonzero `pretty` = unicode |
+| `box` | `(c: Canvas, x: int, y: int, w: int, h: int, pretty: int) -> Canvas` | Border; nonzero `pretty` = unicode. One splice per row |
+| `hline` / `vline` | `(c: Canvas, x: int, y: int, n: int, g: str) -> Canvas` | Clipped runs, one pass each |
+| `styled` | `(c: Canvas, x: int, y: int, g: str) -> Canvas` | Styled overlay replacing the cell at render (O(1) append) |
+| `clear_ov` | `(c: Canvas) -> Canvas` | Drop overlays, keep the grid |
 | `render` | `(c: Canvas) -> [str]` | Row strings (ANSI preserved) |
 | `present` | `(rows: [str]) -> unit` | Blit from top-left + flush (no clear → no flicker) |
 | `bar` | `(frac: float, w: int) -> str` | `"[█████░░░]"`, frac clamped to [0, 1] |

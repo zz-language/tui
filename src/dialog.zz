@@ -2,11 +2,11 @@
 //
 // `note` shows lines until any key; `confirm_box` asks yes/no.
 // Piped stdin falls back to printed lines plus plain input.
-import tui.canvas
+import tui.canvas as canvas
 import tui.keys
 import tui.screen
 
-func dlg(c: Canvas, lines: [str]) -> Canvas {
+func dlg(c: canvas.Canvas, lines: [str]) -> canvas.Canvas {
     w := 0
     i := 0
     while i < len(lines) {
@@ -45,7 +45,7 @@ pub func note(lines: [str]) -> int {
             println(lines[i])
             i = i + 1
         }
-        s := input("[Enter] ")
+        _ := input("[Enter] ")
         return keys.enter()
     }
     sz := screen.size()

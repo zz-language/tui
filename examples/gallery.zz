@@ -2,6 +2,7 @@
 // native-parity check) plus a live menu when passed "live".
 import tui.canvas
 import tui.menu
+import tui.textline
 
 func demo() {
     c := canvas.blank(20, 7, " ")
@@ -16,6 +17,10 @@ func demo() {
         i = i + 1
     }
     println("menu step demo: " + str(menu.step(0, 3, 1002)))
+    (t1, p1) := textline.insert("ac", 1, "b")
+    println("insert demo: " + t1 + " @" + str(p1))
+    (t2, p2) := textline.erase("abc", 2)
+    println("erase demo: " + t2 + " @" + str(p2))
     println("gallery_ok")
 }
 
