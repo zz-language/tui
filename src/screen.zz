@@ -8,7 +8,6 @@
 import std.env
 import std.str
 import std.term
-import std.term
 
 // Enter screen mode: raw + alternate screen + hidden cursor.
 // Returns false (leaving the terminal untouched) when stdin is no TTY.
