@@ -14,11 +14,7 @@ runs the whole show — board games, dashboards, editors, file browsers.
 zz add tui
 ```
 
-> Requires a dev toolchain with `std.term.poll` (the released
-> toolchain does not have it yet — build `zz` from source).
-
 ## Hello, screen
-
 ```zz
 import tui.screen
 import tui.keys
